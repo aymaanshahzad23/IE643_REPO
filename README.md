@@ -1,4 +1,4 @@
-# Document Processing Application
+# Image to Latex Application
 
 A Streamlit-based web application that processes PDF documents and images, performing segmentation analysis and generating structured output. The app supports both PDF documents with multiple pages and individual image files.
 
