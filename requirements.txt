@@ -1,0 +1,8 @@
+torch
+transformers
+pillow
+pytesseract
+easyocr
+opencv-python
+safetensors
+google-colab
