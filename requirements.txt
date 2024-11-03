@@ -6,3 +6,4 @@ easyocr
 opencv-python
 safetensors
 google-colab
+
