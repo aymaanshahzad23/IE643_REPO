@@ -2,6 +2,9 @@ import cv2
 import numpy as np
 import pytesseract
 import easyocr
+import torch
+from PIL import Image
+from transformers import AutoProcessor, VisionEncoderDecoderModel
 
 # Initialize EasyOCR reader/
 reader = easyocr.Reader(['en'])
@@ -190,23 +193,17 @@ image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)  # Load in grayscale
 # Step 1: Segment the image iteratively
 segmented_image = iterative_segment_image(image, max_segments=10)
 
-# Optiona/l: Display the segmented image
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
 # Step 2: Save the segmented image with bounding boxes
 
 output_path = 'segmented_with_boxes.png'  # Output path for the segmented image
 cv2.imwrite(output_path, segmented_image)
 print(f'Segmented image saved to: {output_path}')
 
-import torch
-from PIL import Image
-from transformers import AutoProcessor, VisionEncoderDecoderModel
+
 
 # Load model & processor
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = VisionEncoderDecoderModel.from_pretrained('/content/formula_model', 
+model = VisionEncoderDecoderModel.from_pretrained('./formula_model', 
     local_files_only=True, 
     use_safetensors=True
 ).to(device)
@@ -292,18 +289,18 @@ for i in SEGMENT_IMAGE_SET:
   L[i]=classification
 print(L)
 
+result = []
+
 for i in L:
-  if L[i] == "Formula":
-    latex_expression = generate_latex_from_image(i)
-    print(latex_expression)
-  else:
-    text = extract_text_from_image(i)
-    print(text)
+    if L[i] == "Formula":
+        latex_expression = generate_latex_from_image(i)
+        result.append(f"\\begin{{equation}}\n{latex_expression}\n\\end{{equation}}")
+    else:
+        text = extract_text_from_image(i)
+        result.append(f"\n{text}\n\\")
 
+# Join all items in result list with newline comments
+final_output = "\n%----\n".join(result)
+final_output.replace("%", "\%")
+print(final_output)
 
-# # Perform OCR on the image
-#     results = reader.readtext(image_path)
-
-# # Extract the text and join it into a single string
-#     extracted_text = ' '.join([text for (_, text, _) in results])
-#     print(extracted_text)
