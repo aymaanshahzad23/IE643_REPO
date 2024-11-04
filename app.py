@@ -19,12 +19,34 @@ st.set_page_config(
 if 'temp_files' not in st.session_state:
     st.session_state.temp_files = []
 
+
+def convert_to_black_and_white(image_path):
+    image = Image.open(image_path)
+    bw_image = image.convert('L')
+    threshold = 130  # You can adjust this value
+    binary_image = bw_image.point(lambda p: 255 if p > threshold else 0)
+    
+    # Save the binary image to a temporary file
+    binary_image_path = create_temp_file(suffix=".png")
+    binary_image.save(binary_image_path)
+    return binary_image_path
+
 def cleanup_temp_files():
-    """Clean up temporary files from previous runs"""
-    for temp_file in st.session_state.temp_files:
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-    st.session_state.temp_files = []
+    """Clean up all temporary files created during the process."""
+    if 'temp_files' in st.session_state:
+        for temp_file in st.session_state.temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    print(f"Deleted temporary file: {temp_file}")
+                else:
+                    print(f"Temporary file not found: {temp_file}")
+            except Exception as e:
+                print(f"Error deleting file {temp_file}: {e}")
+        st.session_state.temp_files = []  # Clear the list after cleanup
+    else:
+        print("No temporary files to clean up.")
+
 
 def create_temp_file(suffix=".png"):
     """Create a temporary file and track it for cleanup"""
@@ -61,12 +83,12 @@ def iterative_segment_image(image, max_segments=10, density_threshold=FORMULA_TH
     iteration = 1
     formula_density = 1
 
-    while segment_count < max_segments and kernel_size > 25 and formula_density > density_threshold:
+    while segment_count < max_segments and kernel_size > 26 and formula_density > density_threshold:
         thresh = cv2.adaptiveThreshold(
             image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
         )
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (300, kernel_size))
         closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
 
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(closed, connectivity=8)
@@ -114,10 +136,14 @@ def estimate_formula_density(image, stats):
     return formula_symbols_count / max(total_chars, 1)
 
 def preprocess_image(image_path):
-    """Your original preprocess_image function"""
+    """Preprocess the image and save it as a temporary file"""
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     _, thresh_image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    return thresh_image
+    
+    # Create a temporary file to save the thresholded image
+    preprocessed_image_path = create_temp_file(suffix=".png")
+    cv2.imwrite(preprocessed_image_path, thresh_image)  # Save thresholded image
+    return preprocessed_image_path  # Return the path of the processed image
 
 def extract_text(image, use_easyocr=False):
     """Your original extract_text function"""
@@ -139,11 +165,13 @@ def classify_text_type(extracted_text):
     return "Formula" if symbol_density >= FORMULA_THRESHOLD_2 else "Text"
 
 def classify_image(image_path, use_easyocr=False):
-    """Your original classify_image function"""
-    preprocessed_image = preprocess_image(image_path)
+    """Classify the content of a binary-preprocessed image as Formula or Text"""
+    preprocessed_image_path = preprocess_image(image_path)  # This now returns a path
+    preprocessed_image = cv2.imread(preprocessed_image_path, cv2.IMREAD_GRAYSCALE)
     extracted_text = extract_text(preprocessed_image, use_easyocr=use_easyocr)
     classification = classify_text_type(extracted_text)
     return classification
+
 
 def resize_image(input_path, output_path, new_width, new_height):
     """Your original resize_image function"""
@@ -213,86 +241,145 @@ def extract_text_from_image(image_path: str) -> str:
 
 def main():
     st.title("Formula Detection and Recognition App")
-    
+
     # Load models
     model, processor = load_models()
-    
+
     # File upload
-    uploaded_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg"])
-    
+    uploaded_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg", "pdf"])
+
     if uploaded_file is not None:
-        # Clean up previous temporary files
-        cleanup_temp_files()
-        SEGMENT_IMAGE_SET.clear()
-        
-        # Create temporary file for input image
-        input_path = create_temp_file()
-        with open(input_path, "wb") as f:
-            f.write(uploaded_file.getvalue())
-        
-        # Display original image
-        st.subheader("Original Image")
-        st.image(input_path)
-        
-        # Process image
-        if st.button("Process Image"):
-            with st.spinner("Processing image..."):
-                # Resize image using your original parameters
-                output_path = create_temp_file()
-                resize_image(input_path, output_path, 1300, 900)
-                
-                # Load and process image
-                image = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
-                
-                # Segment image using your original function
-                segmented_image = iterative_segment_image(image)
-                
-                # Display segmented image
-                st.subheader("Segmented Image")
-                st.image(segmented_image)
-                
-                # Process segments using your original classification
-                # st.subheader("Detected Text and Formulas")
-                
-                # Create classification dictionary as in your original code
-                L = {}
-                for i in SEGMENT_IMAGE_SET:
-                    classification = classify_image(i, use_easyocr=True)
-                    print(f'Classification{i}: {classification}')
-                    L[i] = classification
-                
-                # Generate results as in your original code
-                result = []
-                for i in L:
-                    if L[i] == "Formula":
-                        latex_expression = generate_latex_from_image(i, model, processor)
-                        result.append(f"\\begin{{equation}}\n{latex_expression}\n\\end{{equation}}")
-                        # st.write("Formula detected:")
-                        # st.latex(latex_expression)
-                    else:
-                        text = extract_text_from_image(i)
-                        result.append(f"\n{text}\n")
-                        # st.write(f"Text detected: {text}")
-                    
-                    # st.image(i)
-                    # st.markdown("---")
-                
-                # Display final output as in your original code
-                final_output = "\n%----\n".join(result)
-                final_output.replace("%", "\%")
-                st.subheader("Complete Output")
-                # st.text(final_output)
-                col1, col2 = st.columns([4, 1])
-                
-                # Display the text area in the first column
-                with col1:
-                    st.text_area("", value=final_output, height=500, key="output_area")
-                
-                # Display the copy button in the second column
-                # with col2:
-                #     if st.button("📋 Copy", key="copy_button"):
-                #         st.write("Copied to clipboard!")
-                #         st.session_state['clipboard'] = final_output
+        SEGMENT_IMAGE_SET.clear()  # Clear segment list at the start
+
+        # Check if the uploaded file is a PDF
+        if uploaded_file.type == "application/pdf":
+            # Create a temporary file for the PDF
+            pdf_temp_file = create_temp_file(suffix=".pdf")
+            with open(pdf_temp_file, "wb") as f:
+                f.write(uploaded_file.getvalue())
+
+            # Convert PDF pages to images
+            pdf_image_files = convert_pdf_to_images(pdf_temp_file)
+            SEGMENT_IMAGE_SET.extend(pdf_image_files)  # Add the converted images to the segment list
+
+            # Process each image in the segment list
+            for image_path in SEGMENT_IMAGE_SET:
+                # Convert the uploaded image to black and white
+                bw_image_path = convert_to_black_and_white(image_path)
+
+                # Display original image
+                st.subheader("Original Image")
+                st.image(image_path)
+
+                # Process image
+                if st.button(f"Process Image: {image_path}"):
+                    with st.spinner("Processing image..."):
+                        # Resize image
+                        output_path = create_temp_file()
+                        resize_image(bw_image_path, output_path, 1000, 2000)
+
+                        # Load and process image
+                        image = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
+
+                        # Segment image using your original function
+                        segmented_image = iterative_segment_image(image)
+
+                        # Display segmented image
+                        st.subheader("Segmented Image")
+                        st.image(segmented_image)
+
+                        # Process segments using your original classification
+                        L = {}
+                        for img_path in SEGMENT_IMAGE_SET:
+                            classification = classify_image(img_path, use_easyocr=True)
+                            print(f'Classification {img_path}: {classification}')
+                            L[img_path] = classification
+
+                        # Generate results as in your original code
+                        result = []
+                        for img_path in L:
+                            if L[img_path] == "Formula":
+                                latex_expression = generate_latex_from_image(img_path, model, processor)
+                                formulas = latex_expression.split("\\newline")
+                                for formula in formulas:
+                                    result.append(f"\\begin{{equation}}\n{formula}\n\\end{{equation}}")
+                            else:
+                                text = extract_text_from_image(img_path)
+                                result.append(f"\n{text}\n")
+
+                        # Display final output as in your original code
+                        final_output = "\n%----\n".join(result)
+                        final_output.replace("%", "\%")
+                        st.subheader("Complete Output")
+                        col1, col2 = st.columns([4, 1])
+
+                        # Display the text area in the first column
+                        with col1:
+                            st.text_area("", value=final_output, height=500, key="output_area")
+            # Cleanup after processing all images
+            cleanup_temp_files()
+
+        else:
+            # Create temporary file for input image
+            input_path = create_temp_file()
+            with open(input_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+
+            # Convert the uploaded image to black and white
+            bw_image_path = convert_to_black_and_white(input_path)
+
+            # Display original image
+            st.subheader("Original Image")
+            st.image(input_path)
+
+            # Process image
+            if st.button("Process Image"):
+                with st.spinner("Processing image..."):
+                    # Resize image
+                    output_path = create_temp_file()
+                    resize_image(bw_image_path, output_path, 900, 2000)
+
+                    # Load and process image
+                    image = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
+
+                    # Segment image using your original function
+                    segmented_image = iterative_segment_image(image)
+
+                    # Display segmented image
+                    st.subheader("Segmented Image")
+                    # st.image(segmented_image)
+
+                    # Process segments using your original classification
+                    L = {}
+                    for img_path in SEGMENT_IMAGE_SET:
+                        classification = classify_image(img_path, use_easyocr=True)
+                        print(f'Classification {img_path}: {classification}')
+                        L[img_path] = classification
+
+                    # Generate results as in your original code
+                    result = []
+                    for img_path in L:
+                        if L[img_path] == "Formula":
+                            latex_expression = generate_latex_from_image(img_path, model, processor)
+                            formulas = latex_expression.split("\\newline")
+                            for formula in formulas:
+                                result.append(f"\\begin{{equation}}\n{formula}\n\\end{{equation}}")
+                        else:
+                            text = extract_text_from_image(img_path)
+                            result.append(f"\n{text}\n")
+
+                    # Display final output as in your original code
+                    final_output = "\n%----\n".join(result)
+                    final_output.replace("%", "\%")
+                    st.subheader("Complete Output")
+                    col1, col2 = st.columns([4, 1])
+
+                    # Display the text area in the first column
+                    with col1:
+                        st.markdown(f"```\n{final_output}\n```", unsafe_allow_html=True)
+            # Cleanup after processing the single image
+            cleanup_temp_files()
+
 
 if __name__ == "__main__":
     main()
