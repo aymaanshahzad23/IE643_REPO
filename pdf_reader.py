@@ -8,6 +8,8 @@ from PIL import Image
 import os
 import tempfile
 from transformers import AutoProcessor, VisionEncoderDecoderModel
+import streamlit as st
+from pdf2image import convert_from_path
 
 # Set page config
 st.set_page_config(
@@ -173,7 +175,6 @@ def classify_image(image_path, use_easyocr=False):
     classification = classify_text_type(extracted_text)
     return classification
 
-
 def resize_image(input_path, output_path, new_width, new_height):
     """Your original resize_image function"""
     with Image.open(input_path) as img:
@@ -240,10 +241,6 @@ def extract_text_from_image(image_path: str) -> str:
     extracted_text = ' '.join([text for (_, text, _) in results])
     return extracted_text
 
-import streamlit as st
-from pdf2image import convert_from_path
-import tempfile
-import os
 
 def convert_pdf_to_images(pdf_path):
     """
@@ -350,6 +347,7 @@ def main():
                         # Display final output for this page
                         final_output = "\n%----\n".join(result)
                         final_output = final_output.replace("%", "\%")
+                        final_output = final_output.replace("\%---", "%")
                         st.subheader(f"Output - Page {i+1}")
                         st.markdown(f"```\n{final_output}\n```", unsafe_allow_html=True)
 
@@ -384,7 +382,7 @@ def main():
 
                     # Display segmented image
                     st.subheader("Segmented Image")
-                    # st.image(segmented_image)
+                    st.image(segmented_image)
 
                     # Process segments using your original classification
                     L = {}
@@ -398,18 +396,19 @@ def main():
                     for img_path in L:
                         if L[img_path] == "Formula":
                             latex_expression = generate_latex_from_image(img_path, model, processor)
-                            latex_expression.replace("%", "\%")
+                            
                             formulas = latex_expression.split("\\newline")
                             for formula in formulas:
                                 result.append(f"\\begin{{equation}}\n{formula}\n\\end{{equation}}")
                         else:
                             text = extract_text_from_image(img_path)
-                            text.replace("%", "\%")
+                            
                             result.append(f"\n{text}\n")
 
                     # Display final output as in your original code
                     # final_output.replace("%", "\%")
-                    final_output = "\n%----\n".join(result)
+                    final_output = "\n".join(result)
+                    # final_output.replace("\%", "%")
                     st.subheader("Complete Output")
                     col1, col2 = st.columns([4, 1])
 

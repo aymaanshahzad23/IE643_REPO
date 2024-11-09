@@ -276,7 +276,7 @@ def main():
                     with st.spinner("Processing image..."):
                         # Resize image
                         output_path = create_temp_file()
-                        resize_image(bw_image_path, output_path, 1000, 2000)
+                        resize_image(bw_image_path, output_path, 1200, 2000)
 
                         # Load and process image
                         image = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
@@ -347,7 +347,7 @@ def main():
 
                     # Display segmented image
                     st.subheader("Segmented Image")
-                    # st.image(segmented_image)
+                    st.image(segmented_image)
 
                     # Process segments using your original classification
                     L = {}
@@ -369,8 +369,8 @@ def main():
                             result.append(f"\n{text}\n")
 
                     # Display final output as in your original code
-                    final_output = "\n%----\n".join(result)
-                    final_output.replace("%", "\%")
+                    final_output = "\n".join(result)
+
                     st.subheader("Complete Output")
                     col1, col2 = st.columns([4, 1])
 
