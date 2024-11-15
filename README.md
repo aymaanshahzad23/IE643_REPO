@@ -120,6 +120,7 @@ pip install -r requirements.txt
 ├── nice_new.png             # Another sample image for testing (also converted to black and white)
 ├── requirements.txt         # List of dependencies required for the project
 └── .DS_Store                # MacOS system file (should be removed from the repository)
+
 ---
 
 ## Acknowledgements
