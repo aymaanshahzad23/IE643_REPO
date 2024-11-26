@@ -59,7 +59,7 @@ def create_temp_file(suffix=".png"):
 # Your original code and functions unchanged
 SEGMENT_IMAGE_SET = []
 FORMULA_THRESHOLD = 0.7
-FORMULA_THRESHOLD_2 = 0.1
+FORMULA_THRESHOLD_2 = 0.05
 
 # Copy of your original math_symbols set
 math_symbols = set([
@@ -312,7 +312,7 @@ def main():
                     with st.spinner(f"Processing page {i+1}..."):
                         # Resize image
                         output_path = create_temp_file()
-                        resize_image(bw_image_path, output_path, 3300, 1800)
+                        resize_image(bw_image_path, output_path, 1200,2200)
 
                         # Load and process image
                         image = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
